@@ -1,0 +1,13 @@
+(*#trace Yamicrokanren.Munkanren.mplus;;*)
+(*#trace Yamicrokanren.Munkanren.bind;;*)
+(*#trace Yamicrokanren.Munkanren.call_fresh;;*)
+(*#trace Yamicrokanren.Munkanren.just;;*)
+#trace Yamicrokanren.Munkanren.match_goal;;
+(*#trace Yamicrokanren.Munkanren.disj;;*)
+(*#trace Yamicrokanren.Munkanren.conj;;*)
+(*#trace Yamicrokanren.Munkanren.unify;;*)
+(*#trace Yamicrokanren.Munkanren.ext_s;;*)
+(*#trace Yamicrokanren.Munkanren.walk;;*)
+(*#trace Yamicrokanren.Munkanren.Index.succ;;*)
+open Yamicrokanren.Database;;
+

@@ -1,0 +1,5 @@
+(executable
+ (public_name yamicrokanren)
+ (name main)
+ (libraries yamicrokanren)
+ (modules main family))
