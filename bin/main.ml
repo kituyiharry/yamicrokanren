@@ -84,19 +84,19 @@ let () =
 
         let _ = Format.printf "\nMale   ============================================\n" in
         let _ = 
-            (FamilyTree.query (Database.relation "male") fam |> List.iter (Fun.compose print_newline print_string))
+            (FamilyTree.query (Fun.id) (Database.relation "male") fam |> List.iter (Fun.compose print_newline print_string))
         in
         let _ = Format.printf "\nFemale ============================================\n" in
         let _ = 
-            (FamilyTree.query (Database.relation "female") fam |> List.iter (Fun.compose print_newline print_string))
+            (FamilyTree.query (Fun.id) (Database.relation "female") fam |> List.iter (Fun.compose print_newline print_string))
         in
         let _ = Format.printf "\nParent ============================================\n" in
         let _ = 
-            (FamilyTree.query (Database.relation "parent") fam |> List.iter (Fun.compose print_newline print_string))
+            (FamilyTree.query (Fun.id) (Database.relation "parent") fam |> List.iter (Fun.compose print_newline print_string))
         in
         let _ = Format.printf "\nParent - Child ============================================\n" in
         let _ = 
-            (FamilyTree.query (fun t db ->
+            (FamilyTree.query (Fun.id) (fun t db ->
                     call_fresh (fun t' -> 
                         conj_many (
                             [
@@ -109,7 +109,7 @@ let () =
         in
         let _ = Format.printf "\nRandys Mother ============================================\n" in
         let _ = 
-            (FamilyTree.query (fun t db ->
+            (FamilyTree.query (Fun.id) (fun t db ->
                      (*parent of randy who is female *)
                     conj_many (
                         [
@@ -121,7 +121,7 @@ let () =
         in
         let _ = Format.printf "\nRandys Father  ============================================\n" in
         let _ = 
-            (FamilyTree.query (fun t db ->
+            (FamilyTree.query (Fun.id) (fun t db ->
                 call_fresh (fun t' -> 
                     Database.apply "father" [| t; (Const (FamilyTree.seed "Randy" fam)) |] db
                 )
@@ -131,7 +131,12 @@ let () =
         let _ = Format.printf "\nGrandparents ============================================\n" in
         let _ = 
             (* NOTE: You will need to filter out intermediate values when reifying *)
-            (FamilyTree.query (fun t db ->
+            (FamilyTree.query (Env.filter (fun _ -> function 
+                (* filter other intermediate values *)
+                | Pair _ -> true
+                | _     ->  false
+                )
+            ) (fun t db ->
                 call_fresh (fun u -> 
                     call_fresh (fun v -> 
                         (conj

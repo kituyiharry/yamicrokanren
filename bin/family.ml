@@ -83,13 +83,13 @@ module FamilyTree = struct
     ;;
 
     (* Just dumps the env at the end - might want to be more selective ?? *)
-    let query logic state reifier = 
+    let query reifier logic state = 
         let _tblvals = List.rev state.log |> Array.of_list in
         let _data = (
             (* fold to collect  *)
             stream_fold (fun acc (State (envstate, _bucket)) -> 
                 (* this is where we should filter out what variables we care about - in the reification! *)
-                Env.fold (fun _  y acc -> (reifier envstate y _tblvals) :: acc) envstate acc
+                Env.fold (fun _  y acc -> (reify envstate y _tblvals) :: acc) (reifier envstate) acc
             ) []
             (*dump_stream @@ *)
             (call_fresh (fun t -> logic t state.db) empty_state) 
