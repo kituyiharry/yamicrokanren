@@ -70,12 +70,12 @@ module FamilyTree = struct
                         (Format.sprintf "%s -- %s"   _tblvals.(left - 1) _tblvals.(right-1))
                     | (Const left, z') -> 
                         (*(Format.sprintf "%s -- (%s)" _tblvals.(left - 1) (collect z'))*)
-                        (Format.sprintf "%s -- (%s)" _tblvals.(left - 1) ("->??"))
-                    | (z, z') -> 
-                        "??-??"
-                        (*(Format.sprintf "[%s] -- [%s]" *)
-                            (*(collect z ) *)
-                            (*(collect z'))*)
+                        (Format.sprintf "%s -- (%s)" _tblvals.(left - 1) (collect z'))
+                    | (z', Const right) -> 
+                        (*(Format.sprintf "%s -- (%s)" _tblvals.(left - 1) (collect z'))*)
+                        (Format.sprintf "(%s) -- %s" (collect z') _tblvals.(right - 1))
+                    | (z,  z') -> 
+                        Format.sprintf "(%s--%s)" (collect z) (collect z')
                 )
             | _ -> 
                 "??"

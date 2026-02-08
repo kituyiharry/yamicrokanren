@@ -67,12 +67,9 @@ let joinpairs bindfn items =
   let rec recur g2 = 
       (match g2 with 
       | [] -> failwith "unreachable!! at least 2 goals needed!"
-      | g :: [] -> 
-        g
-      | g :: g' :: [] -> 
-          (fun t -> bindfn g g') 
-      | g :: rem -> 
-          (fun t -> bindfn g (recur rem))
+      | g :: [] -> g
+      | g :: g' :: [] -> (fun t -> bindfn g g') 
+      | g :: rem -> (fun t -> bindfn g (recur rem))
       )
   in (bindfn (List.hd items) (recur @@ List.tl items)) 
 ;;

@@ -4,46 +4,7 @@ open Family;;
 
 let () =
     let _ = (
-        (*call_fresh (fun q -> match_goal q (Const 5)) empty_state*)
-        (* - : Mukanren.stream = Cons (State (<abstr>, 1l), Mzero) *)
-
-        (*let _ = dump_stream (call_fresh (fun q -> match_goal q (Const 5)) empty_state) in*)
-        (* next = $1 *)
-        (* $0 = 5 *)
-        (* - : unit = () *)
-        (*let _ = Format.printf "1. ============================================\n" in*)
-
-        (*let _ = dump_stream (call_fresh (fun q -> match_goal (Pair (q, q)) (Const 5)) empty_state) in*)
-        (* - : unit = () *)
-        (*let _ = Format.printf "2.============================================\n" in*)
-        
-        (*let _ = dump_stream (call_fresh (fun q -> match_goal (Pair (q, q)) (Pair (Const 5, Const 5))) empty_state) in*)
-        (* next = $1 *)
-        (* $0 = 5 *)
-        (* - : unit = () *)
-        (*let _ = Format.printf "3.============================================\n" in*)
-
-        (*let _ = dump_stream (call_fresh (fun q -> match_goal (Pair (q, q)) (Pair (Const 6, Const 5))) empty_state) in*)
-        (* - : unit = () *)
-        (*let _ = Format.printf "4.============================================\n" in*)
-
-        (*let _ = dump_stream (call_fresh (fun q -> match_goal q (Pair (Const 6, Pair(Const 0, Const 5)))) empty_state) in *)
-        (* next = $1 *)
-        (* $0 = (6 0 . 5) *)
-        (* - : unit = () *)
-
-        (*let _ = dump_stream (conj (call_fresh (fun a -> match_goal a (Const 7))) (call_fresh (fun b -> disj (match_goal b (Const 5)) (match_goal b (Const 6)))) empty_state) in*)
-        (* next = $2 *)
-        (* $0 = 7 *)
-        (* $1 = 6 *)
-        (* next = $2 *)
-        (* $0 = 7 *)
-        (* $1 = 5 *)
-        (* - : unit = () *)
-
-        let _ = Format.printf "5.============================================\n" in
         let _ = Format.printf "\nFamily ============================================\n" in
-
         let fam = 
             FamilyTree.start
             |> FamilyTree.male   "Don" 
@@ -79,7 +40,6 @@ let () =
                     ) cstate
                 )
             )
-            (*|> FamilyTree.parent "Rosie" "Anne"*)
         in
 
         let _ = Format.printf "\nMale   ============================================\n" in
@@ -96,16 +56,7 @@ let () =
         in
         let _ = Format.printf "\nParent - Child ============================================\n" in
         let _ = 
-            (FamilyTree.query (Fun.id) (fun t db ->
-                    call_fresh (fun t' -> 
-                        conj_many (
-                            [
-                                Database.multirelation "parent" [ t'; t ] db
-                            ;   (match_goal t (Pair (t, t')))
-                            ]
-                        )
-                    )
-            ) fam |> List.iter (Fun.compose print_newline print_string))
+            (FamilyTree.query (Fun.id) (Database.relation "parent") fam |> List.iter (Fun.compose print_newline print_string))
         in
         let _ = Format.printf "\nRandys Mother ============================================\n" in
         let _ = 
@@ -134,7 +85,7 @@ let () =
             (FamilyTree.query (Env.filter (fun _ -> function 
                 (* filter other intermediate values *)
                 | Pair _ -> true
-                | _     ->  false
+                | _      -> false
                 )
             ) (fun t db ->
                 call_fresh (fun u -> 
