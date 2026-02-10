@@ -4,7 +4,7 @@ open Family;;
 
 let () =
     let _ = (
-        let _ = Format.printf "\nFamily ============================================\n" in
+       let _ = Format.printf "\nFamily ============================================\n" in
         let fam = 
             FamilyTree.start
             |> FamilyTree.male   "Don" 
@@ -98,6 +98,35 @@ let () =
                 );
             )) fam |> List.iter (Fun.compose print_newline print_string)
         in
+
+        let rec appendo l r out =
+            disj 
+                (conj (match_goal l (TList [])) (match_goal r out))
+                (call_fresh (fun a -> 
+                    (call_fresh (fun d -> 
+                        (call_fresh (fun res -> 
+                            conj
+                                (match_goal l (Pair (a, d)))
+                                (conj   
+                                    (match_goal out (Pair (a, res)))
+                                    (appendo d r res)
+                                )
+                        ))
+                    ))
+                )
+            )
+        in
+
+        let _ = Format.printf "\n=========================================================\n" in
+        let _ = Format.printf "\n=========================================================\n" in
+
+        (* Test appendo *)
+
+        let _ = dump_stream @@ call_fresh (fun x -> 
+            appendo (TList [ (Const 1); (Const 3) ]) (TList [ (Const 2) ]) x
+        ) empty_state in
+
+ 
         ()
 
     ) in
