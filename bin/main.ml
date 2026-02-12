@@ -125,7 +125,6 @@ let () =
         let _ = dump_stream @@ call_fresh (fun x -> 
             appendo (TList [ (Const 1); (Const 3) ]) (TList [ (Const 2) ]) x
         ) empty_state in
-
  
         ()
 

@@ -1,8 +1,8 @@
-(** NB: This is a modified reference implementation from http://canonical.org/~kragen/sw/dev3/mukanren.ml 
+(** NB: This is a modified implementation from http://canonical.org/~kragen/sw/dev3/mukanren.ml 
     - Additions:
         - support list terms
-        - add thunk unwraping and truncating
-        - swapping order of inputs in mplus for exploration
+        - add thunk unwrapping and truncating
+        - swapping order of inputs in mplus for breadth exploration
         - some printers
 *)
 
@@ -53,6 +53,14 @@ and unify (u : term) (v : term) (s : env) = match walk s u, walk s v with
         | None -> None)
     | TList u', TList v' ->
         (match (u', v') with 
+            | [], [] -> Some s
+            | x :: x' :: [], y :: y' :: [] -> 
+                (match unify x y s with 
+                    | Some s' -> 
+                        unify x' y' s'
+                    | _ -> 
+                        None
+                )
             | x :: x', y :: y' -> 
                 (match unify x y s with 
                     | Some s' -> 
@@ -60,8 +68,6 @@ and unify (u : term) (v : term) (s : env) = match walk s u, walk s v with
                     | _ -> 
                         None
                 )
-            | [], [] -> 
-                Some s
             | _ -> 
                 None
         )
@@ -282,7 +288,7 @@ dump_stream (call_fresh lazy_fives empty_state) ;;
 
 call_fresh (fun f -> disj (lazy_fives f) (lazy_sixes f) ) empty_state |> take 5 |> dump_stream;;
     next = $1 {
-         $0 = 6 
+        $0 = 6 
     }
     next = $1 {
         $0 = 5

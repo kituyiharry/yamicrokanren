@@ -50,9 +50,7 @@ module Database = struct
                 | varlist -> (
                     (varlist
                         (* variable can be substituted for any of these variables *)
-                        |> List.map (fun v ->
-                            (match_goal argvar v)
-                        )
+                        |> List.map (match_goal argvar)
                         (*|> List.map (fun (x, y) -> (match_goal x y)) (* build eq goals for unification *)*)
                         |> disj_many
                     ) init
