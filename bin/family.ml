@@ -77,6 +77,12 @@ module FamilyTree = struct
                     | (z,  z') -> 
                         Format.sprintf "(%s--%s)" (collect z) (collect z')
                 )
+            | TList lst -> 
+                "[ " ^
+                    (List.map (collect) lst
+                    |> String.concat ", ")
+                ^
+                "] "
             | _ -> 
                 "??"
         in collect y

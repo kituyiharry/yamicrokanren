@@ -1,5 +1,5 @@
 (** NB: This is a modified implementation from http://canonical.org/~kragen/sw/dev3/mukanren.ml 
-    - Additions:
+    - Additions by (@kituyiharry):
         - support list terms
         - add thunk unwrapping and truncating
         - swapping order of inputs in mplus for breadth exploration
@@ -17,7 +17,8 @@ module Index = Int ;;        (* The type of logic variable indices *)
 
 module Env = Map.Make(Index) (* maps logic variables to terms *)
  
-type var  = Var of (Index.t [@printer (fun fmt -> Format.fprintf fmt "%d")])  (* the index is a counter typically from call_fresh *)
+(** the index is a counter typically from call_fresh *)
+type var  = Var of (Index.t [@printer (fun fmt -> Format.fprintf fmt "%d")])  
 [@@deriving show, ord]
 
 (* TODO: function from term to term and lists *)
@@ -28,20 +29,19 @@ type term = Vart of var | Const of int | Pair of term * term | TList of term lis
 type env  = term Env.t
 ;;
 
-(* Compute what the value of the given term in s is, which may be an
- * unbound var *)
+(** Compute what the value of the given term in s is, which may be an unbound var *)
 let rec walk (s : env) = function
   | Vart (Var x) when Env.mem x s -> walk s (Env.find x s)
   | u -> u
 
-(* Extend an environment with a new binding *)
+(** Extend an environment with a new binding *)
 and ext_s (Var x) (v : term) (s : env) = Env.add x v s
 
-(* Compute under what conditions u and v can unify given s *)
+(** Compute under what conditions u and v can unify given s *)
 and unify (u : term) (v : term) (s : env) = match walk s u, walk s v with
-    | u', v' when u' = v' -> Some s       (* when they are the same, or *)
-    | Vart u', v' -> Some (ext_s u' v' s) (* when either is a variable, *)
-    | u', Vart v' -> Some (ext_s v' u' s) (* which we can bind to the other, or *)
+    | u', v' when u' = v' -> Some s         (* when they are the same, or *)
+    | Vart u', v' -> Some (ext_s u' v' s)   (* when either is a variable, *)
+    | u', Vart v' -> Some (ext_s v' u' s)   (* which we can bind to the other, or *)
     | Pair(ua, ud), Pair(va, vd) -> (match unify ua va s with
         | Some s' -> unify ud vd s'         (* when they are pairs *)
         | None -> None)                     (* whose respective members unify *)
@@ -55,19 +55,9 @@ and unify (u : term) (v : term) (s : env) = match walk s u, walk s v with
         (match (u', v') with 
             | [], [] -> Some s
             | x :: x' :: [], y :: y' :: [] -> 
-                (match unify x y s with 
-                    | Some s' -> 
-                        unify x' y' s'
-                    | _ -> 
-                        None
-                )
+                Option.bind (unify x y s) (unify x' y')
             | x :: x', y :: y' -> 
-                (match unify x y s with 
-                    | Some s' -> 
-                        unify (TList x') (TList y') s'
-                    | _ -> 
-                        None
-                )
+                Option.bind (unify x y s) (unify (TList x') (TList y'))
             | _ -> 
                 None
         )
@@ -77,70 +67,53 @@ type 'a stream = Cons of 'a * 'a stream | Thunk of (unit -> 'a stream) | Mzero
 [@@deriving show]
 ;;
 
-(* Monad plus: merge two streams *)
+(** Monad plus: merge two streams *)
 let rec mplus (t : 'a stream) = function
   | Mzero -> t (* If the second stream is empty, return the first stream *)
   | Thunk f -> Thunk (fun () -> mplus (f()) t) (* η⁻¹-delay and swap *)
   | Cons(e, s) -> Cons(e, mplus s t)  (* or simply recurse if eager - swap order to allow exploration! *)
 
-(* Monad bind: transform stream with g *)
+(** Monad bind: transform stream with g *)
 and bind (g : 'a -> 'a stream) = function
   | Mzero   -> Mzero
   | Thunk t -> Thunk (fun () -> bind g (t()))
   | Cons(e, s) -> mplus (g e) (bind g s)
 
-(* Lift a state (or other point) into the stream monad - also called unit *)
+(** Lift a state (or other point) into the stream monad, also called unit *)
 and just s = Cons(s, Mzero)        (* `unit` in Hemann and Friedman *)
 
-type state = State of env * Index.t (* index of the next variable to create *)
+(** index of the next variable to create *)
+type state = State of env * Index.t 
 type goal = state -> state stream
 
-let joinpairs bindfn items = 
-  let rec recur g2 = 
-      (match g2 with 
-      | [] -> failwith "unreachable!! at least 2 goals needed!"
-      | g :: [] -> g
-      | g :: g' :: [] -> (fun t -> bindfn g' g) 
-      | g :: rem -> (fun t -> bindfn g (recur rem))
-      )
-  in (bindfn (List.hd items) (recur @@ List.tl items)) 
-;;
-
-let joinpairsseq bindfn items = 
-  let rec recur g1 = 
-      (match Seq.uncons g1 with 
-      | Some(g, g2) -> 
-            (
-                match Seq.uncons g2 with
-                | Some (g', rem) -> 
-                        (
-                            if Seq.is_empty rem then 
-                                (fun t -> bindfn g g') 
-                            else
-                                (fun t -> bindfn g (recur g2))
-                        )
-                | None -> 
-                    g
-            )
-      | None -> failwith "unreachable!! at least 2 goals needed!"
-      )
-  in (bindfn (fst @@ Option.get @@ Seq.uncons @@ (Seq.take 1 items)) (recur @@ (Seq.drop 1 items))) ;;
-
-(* Disjunction and conjunction of goals *)
+(** Disjunction and conjunction of goals *)
 let rec
-    disj      (g1: goal) (g2 : goal) (t : state)  = mplus (g1 t) (g2 t) and
-    disj_many (g1: goal list) (t: state)          = joinpairs (fun x y -> disj x y t) g1 and
-    disj_seq  (g1: goal Seq.t) (t: state)         = joinpairsseq (fun x y -> disj x y t) g1 and
-    conj      (g1 : goal) (g2 : goal) (t : state) = bind g2 (g1 t) and 
-    conj_many (g1: goal list) (t: state)          = joinpairs (fun x y -> conj x y t) g1  and
-    conj_seq  (g1: goal Seq.t) (t: state)         = joinpairsseq (fun x y -> conj x y t) g1
+    disj (g1: goal) (g2: goal) (t: state) = mplus (g1 t) (g2 t) and
+    conj (g1: goal) (g2: goal) (t: state) = bind g2 (g1 t) and 
+    null (s: state) = Mzero  and  (* a goal that always fails *)
+    nuts (s: state) = just s and  (* a goal that always succeeds *)
+    disj_eager  = function 
+        | Seq.Nil -> null 
+        | Seq.Cons (goal, goals) -> disj goal (disj_eager (goals ()))
+    and
+    conj_eager  = function 
+        | Seq.Nil -> nuts
+        | Seq.Cons (goal, goals) -> conj goal (conj_eager (goals ()))
+    and
+    disj_many = function
+        | [] -> null
+        | goal::goals -> disj goal (disj_many goals) 
+    and 
+    conj_many = function
+        | [] -> nuts
+        | goal::goals -> conj goal (conj_many goals)
 
-(* Supply a fresh logic variable to a goal-returning function *)
 (* <Scheme> I’m relentlessly monomorphic *)
+(** Supply a fresh logic variable to a goal-returning function *)
 and call_fresh (f : term -> goal) (State(e, c)) =
   (f (Vart (Var c))) (State (e, Index.succ c))    (* <OCaml>  hold my beer. *)
 
-(* Create a goal that two things unify, normally called ≡ *)
+(** Create a goal that two things unify, normally called ≡ *)
 let match_goal (u : term) (v : term) (State (s, c)) = match unify u v s with
   | Some s' -> just (State (s', c))
   | None -> Mzero
@@ -192,7 +165,7 @@ and lazy_sixes x =
 and pull = function 
   | Thunk t -> 
         (match t () with 
-        | (Cons (s, s'))  ->
+        | Cons (s, s')  ->
             Some (s, s')
         | Thunk _ as t' -> 
            pull t'
@@ -202,7 +175,7 @@ and pull = function
   | Cons (s, s') -> Some (s, s')
   | Mzero -> None
 and take n s = 
-(* NB: works with disjoints. conj will go into a loop  - see examples *)
+(* WARN: only works with disjoints. conj will go into a loop  - see examples *)
     if  n = 0 then 
         (* truncate the rest *)
         Mzero
@@ -213,15 +186,6 @@ and take n s =
        | None -> 
             s
        )
-and null (s : state) = Mzero            (* a goal that always fails *)
-and disjn = function
-  | [] -> null
-  | goal::goals -> disj goal (disjn goals)
-and nuts (s : state) = just s        (* a goal that always succeeds *)
-and conjn = function
-  | [] -> nuts
-  | goal::goals -> conj goal (conjn goals)
-
 (* A goal that succeeds if v is one of `terms` *)
 and amb (terms : term list) (v : term) = match terms with 
   | [] -> null
