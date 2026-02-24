@@ -2,8 +2,8 @@
     - Additions by (@kituyiharry):
         - support list terms
         - add thunk unwrapping and truncating
-        - swapping order of inputs in mplus for breadth exploration
-        - some printers
+        - binary trampoline in mplus for breadth exploration
+        - some printers, ordering
 *)
 
 (* A translation into OCaml of Hemann and Friedman’s interpreter for the
@@ -29,12 +29,16 @@ type term = Vart of var | Const of int | Pair of term * term | TList of term lis
 type env  = term Env.t
 ;;
 
-(** Compute what the value of the given term in s is, which may be an unbound var *)
+(** Compute what the value of the given term in s is, which may be an unbound
+    var. searches for a variable's value in the substitution; the ext-s operator extends the substitution
+    with a new binding. *)
 let rec walk (s : env) = function
   | Vart (Var x) when Env.mem x s -> walk s (Env.find x s)
   | u -> u
 
-(** Extend an environment with a new binding *)
+(** Extend an environment with a new binding. In Friedman, ext-s performs a
+check for circularities in the substitution; here there is no
+such prohibition*)
 and ext_s (Var x) (v : term) (s : env) = Env.add x v s
 
 (** Compute under what conditions u and v can unify given s *)
@@ -68,17 +72,24 @@ type 'a stream = Cons of 'a * 'a stream | Thunk of (unit -> 'a stream) | Mzero
 [@@deriving show]
 ;;
 
-(** Monad plus: merge two streams *)
+(** Monad plus: merge two streams. mplus simply appends the list returned as the result of the
+rst call to that returned as the result of the second. In this
+form it is simply an implementation of append. *)
 let rec mplus (t : 'a stream) = function
   | Mzero -> t (* If the second stream is empty, return the first stream *)
-  | Thunk f -> Thunk (fun () -> mplus (f()) t) (* η⁻¹-delay and swap *)
-  | Cons(e, s) -> Cons(e, mplus s t)  (* or simply recurse if eager - swap order to allow exploration! *)
+  | Thunk f -> Thunk (fun () -> mplus (f()) t) (* η⁻¹-delay (inverse-eta) and swap *)
+  | Cons(e, s) -> Cons(e, mplus s t)  (* or simply recurse if eager -  In a binary trampoline, two procedures each
+take a step bounded amount of computationaand then
+yield control to the other. In the case of the binary trampoline
+this step-handoff-step-handoff sequence continues until
+one of the two produces a value *)
 
-(** Monad bind: transform stream with g *)
+(** Monad bind: transform stream with g. The bind operator is essentially
+an implemementation of append-map, though with its arguments reversed. *)
 and bind (g : 'a -> 'a stream) = function
-  | Mzero   -> Mzero
-  | Thunk t -> Thunk (fun () -> bind g (t()))
-  | Cons(e, s) -> mplus (g e) (bind g s)
+  | Mzero   -> Mzero                          (* empty stream  *)
+  | Thunk t -> Thunk (fun () -> bind g (t())) (* immature stream *)
+  | Cons(e, s) -> mplus (g e) (bind g s)      (* mature stream *)
 
 (** Lift a state (or other point) into the stream monad, also called unit *)
 and just s = Cons(s, Mzero)        (* `unit` in Hemann and Friedman *)
@@ -117,15 +128,14 @@ let rec
         | [] -> nuts
         | goal::goals -> conj goal (conj_many goals)
 
-(* <Scheme> I’m relentlessly monomorphic *)
 (** Supply a fresh logic variable to a goal-returning function.  *)
 and call_fresh (f : term -> goal) (State(e, c)) =
-  (f (Vart (Var c))) (State (e, Index.succ c))    (* <OCaml>  hold my beer. *)
+  (f (Vart (Var c))) (State (e, Index.succ c))
 
 (** Create a goal that two things unify, normally called ≡. 
     The success of goals built from ≡ may
     cause the state to grow. Unlike the implementation of ≡ de-
-    tailed in Friedman et. al [4], that presented here does not
+    tailed in Friedman et. al, that presented here does not
     prohibit circularities in the substitution. 
   *)
 let match_goal (u : term) (v : term) (State (s, c)) = match unify u v s with
@@ -179,18 +189,15 @@ and lazy_sixes x =
     disj (match_goal x (Const 6)) (fun s -> Thunk(fun () -> (lazy_sixes x) s))
 and pull = function 
   | Thunk t -> 
-        (match t () with 
-        | Cons (s, s')  ->
-            Some (s, s')
-        | Thunk _ as t' -> 
-           pull t'
-        | Mzero -> 
-            None
-        )
+    (match t () with 
+    | Cons (s, s')  -> Some (s, s')
+    | Thunk _ as t' -> pull t'
+    | Mzero -> None
+    )
   | Cons (s, s') -> Some (s, s')
-  | Mzero -> None
+  | Mzero        -> None
 and take n s = 
-(* WARN: only works with disjoints. conj will go into a loop  - see examples *)
+    (* WARN: only works with disjoints. conj will go into a loop  - see examples *)
     if  n = 0 then 
         (* truncate the rest *)
         Mzero
@@ -201,7 +208,7 @@ and take n s =
        | None -> 
             s
        )
-(* A goal that succeeds if v is one of `terms` *)
+(** A goal that succeeds if v is one of `terms` *)
 and amb (terms : term list) (v : term) = match terms with 
   | [] -> null
   | term::ts -> disj (match_goal v term) (amb ts v)
