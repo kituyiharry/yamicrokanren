@@ -4,6 +4,7 @@
         - add thunk unwrapping and truncating
         - binary trampoline in mplus for breadth exploration
         - some printers, ordering
+        - renamed some functions (disjn to disj_many ...)
 *)
 
 (* A translation into OCaml of Hemann and Friedman’s interpreter for the
